@@ -1,7 +1,5 @@
 # 🌙 LunaAstra — Lunar Habitat AI Decision Support System
 
-**Hackathon Problem Code: SW02**
-
 An AI-powered decision support system that identifies optimal locations for long-term human habitats on the Moon by fusing real NASA/ISRO satellite datasets into a scored, ranked, and fully explainable tool with a 3D interactive Moon globe.
 
 ---
@@ -93,4 +91,3 @@ Frontend: Risk badges, mission briefing, Recharts breakdown
 
 ---
 
-*Built for SW02 — Lunar Habitat Site Selection using AI*
