@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import cesium from 'vite-plugin-cesium'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cesium()],
   base: './',   // required for Electron to load assets via file:// protocol
   server: {
     port: 5173,

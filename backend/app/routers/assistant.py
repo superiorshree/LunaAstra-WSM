@@ -61,21 +61,60 @@ class AssistantResponse(BaseModel):
     normalized:    bool = True
 
 
+def _heuristic_extract_weights(text: str) -> dict:
+    """
+    Intelligent offline NLP keyword heuristic parser.
+    Used when Claude API key is absent, offline, or returns auth error.
+    """
+    lower = text.lower()
+    weights = {"ice": 0.20, "illumination": 0.20, "radiation": 0.20, "slope": 0.20, "comm": 0.20}
+
+    # Factor keyword definitions
+    keywords = {
+        "ice": ["water", "ice", "h2o", "isru", "hydrogen", "cabeus", "shackleton", "volatile"],
+        "illumination": ["sun", "solar", "sunlight", "illumination", "power", "energy", "photovoltaic", "light"],
+        "radiation": ["radiation", "shielding", "cosmic", "dose", "storm", "crater floor", "hazard", "safety"],
+        "slope": ["slope", "flat", "flatness", "terrain", "construction", "roughness", "gradient", "landing"],
+        "comm": ["comm", "communication", "earth", "line of sight", "antenna", "signal", "radio", "contact"],
+    }
+
+    # High priority indicators
+    boost_words = ["prioritize", "priority", "important", "critical", "focus", "need", "essential", "primary", "above all"]
+    reduce_words = ["secondary", "ignore", "less", "minor", "minimal", "don't care", "dont care"]
+
+    for factor, factor_words in keywords.items():
+        found = any(w in lower for w in factor_words)
+        if found:
+            # Check if boosted or reduced in proximity
+            if any(bw in lower for bw in boost_words):
+                weights[factor] += 0.30
+            else:
+                weights[factor] += 0.15
+
+        if any(rw in lower and any(fw in lower for fw in factor_words) for rw in reduce_words):
+            weights[factor] = max(0.05, weights[factor] - 0.10)
+
+    # Normalize to sum 1.0
+    total = sum(weights.values())
+    return {k: round(v / total, 4) for k, v in weights.items()}
+
+
 @router.post(
     "",
     response_model=AssistantResponse,
     summary="Convert natural language to weight configuration",
-    description="Calls Claude API to parse a priority statement into a structured weight JSON. The returned weights are ready to pass directly to POST /score.",
+    description="Calls Claude API (with deterministic NLP fallback) to parse a priority statement into structured weight JSON.",
 )
 async def assistant(request: AssistantRequest) -> AssistantResponse:
     if not request.text.strip():
         raise HTTPException(status_code=422, detail="Input text cannot be empty.")
 
-    if not CLAUDE_API_KEY:
-        logger.warning("CLAUDE_API_KEY not set — returning equal default weights")
+    # If no key is set or is placeholder
+    if not CLAUDE_API_KEY or "your_claude_api_key" in CLAUDE_API_KEY:
+        weights = _heuristic_extract_weights(request.text)
         return AssistantResponse(
-            weights=DEFAULT_WEIGHTS,
-            raw_response="[Claude API not configured — default weights returned]",
+            weights=weights,
+            raw_response="[Heuristic NLP Engine Applied — Offline Mode]",
             input_text=request.text,
         )
 
@@ -92,7 +131,7 @@ async def assistant(request: AssistantRequest) -> AssistantResponse:
 
         raw_text = response.content[0].text.strip()
 
-        # Extract JSON robustly (handle if Claude adds any stray text)
+        # Extract JSON robustly
         json_match = re.search(r'\{[^}]+\}', raw_text, re.DOTALL)
         if not json_match:
             raise ValueError(f"Claude did not return valid JSON: {raw_text}")
@@ -120,12 +159,11 @@ async def assistant(request: AssistantRequest) -> AssistantResponse:
             input_text=request.text,
         )
 
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error from Claude: {e}")
-        raise HTTPException(status_code=500, detail="Claude returned malformed JSON.")
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        logger.exception(f"Claude API error in /assistant: {e}")
-        raise HTTPException(status_code=500, detail=f"Claude API error: {type(e).__name__}")
+        logger.warning(f"Claude API offline or auth error ({e}) — activating NLP heuristic fallback.")
+        weights = _heuristic_extract_weights(request.text)
+        return AssistantResponse(
+            weights=weights,
+            raw_response=f"[NLP Heuristic Fallback (Reason: {type(e).__name__})]",
+            input_text=request.text,
+        )

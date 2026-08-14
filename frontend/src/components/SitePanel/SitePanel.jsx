@@ -115,8 +115,8 @@ function SiteCard({ site, isSelected, onSelect }) {
             </div>
           )}
 
-          {/* Mission Briefing */}
-          <div style={{ marginTop: 'var(--space-4)' }}>
+          {/* Mission Briefing & Dossier Actions */}
+          <div style={{ marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <button
               className="btn btn-ghost btn-full"
               onClick={handleBriefing}
@@ -130,8 +130,19 @@ function SiteCard({ site, isSelected, onSelect }) {
               }
             </button>
 
+            <button
+              className="btn btn-primary btn-full"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenReport(site.site_id)
+              }}
+              style={{ fontSize: 12, background: 'rgba(79,142,255,0.15)', borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}
+            >
+              📄 Full Mission Dossier & Export
+            </button>
+
             {briefing && (
-              <div className="briefing-card" style={{ marginTop: 'var(--space-3)' }}>
+              <div className="briefing-card" style={{ marginTop: 'var(--space-2)' }}>
                 <div className="briefing-header">
                   🤖 AI Mission Briefing
                 </div>
@@ -145,7 +156,7 @@ function SiteCard({ site, isSelected, onSelect }) {
   )
 }
 
-export default function SitePanel() {
+export default function SitePanel({ onOpenReport }) {
   const { scoreResult, selectedSite, setSelectedSite, isScoring } = useAppStore()
 
   const sites = scoreResult?.top_sites ?? []
@@ -186,6 +197,7 @@ export default function SitePanel() {
             site={site}
             isSelected={selectedSite?.site_id === site.site_id}
             onSelect={setSelectedSite}
+            onOpenReport={onOpenReport}
           />
         ))}
 

@@ -170,44 +170,54 @@ def _load_geotiff_layers() -> Dict[str, RasterLayer]:
     For large files, uses windowed reading to avoid OOM.
     TODO: Wire in Dask for fully lazy loading when datasets exceed RAM.
     """
+    has_rasterio = False
     try:
         import rasterio
+        has_rasterio = True
     except ImportError:
-        raise ImportError("rasterio is required for GeoTIFF loading. pip install rasterio")
+        logger.info("rasterio not installed; falling back to .npy raster layer loader")
 
     layers = {}
     for factor, path in GEOTIFF_PATHS.items():
-        if not path.exists():
-            raise FileNotFoundError(
-                f"GeoTIFF not found: {path}\n"
-                f"Place your aligned GeoTIFFs in backend/data/raw/ "
-                f"or set USE_MOCK_DATA=true in .env for mock mode."
-            )
+        npy_path = path.with_suffix(".npy")
 
-        logger.info(f"Loading GeoTIFF: {path}")
-        with rasterio.open(path) as src:
-            data = src.read(1).astype(np.float32)   # Band 1
-            nodata = src.nodata
-            bounds = src.bounds
+        if path.exists() and has_rasterio:
+            logger.info(f"Loading GeoTIFF: {path}")
+            with rasterio.open(path) as src:
+                data = src.read(1).astype(np.float32)   # Band 1
+                nodata = src.nodata
+                bounds = src.bounds
 
-            # Replace nodata with NaN
-            if nodata is not None:
-                data[data == nodata] = np.nan
+                if nodata is not None:
+                    data[data == nodata] = np.nan
 
+                layers[factor] = RasterLayer(
+                    name=factor,
+                    data=data,
+                    nodata_value=nodata,
+                    lat_min=bounds.bottom,
+                    lat_max=bounds.top,
+                    lon_min=bounds.left,
+                    lon_max=bounds.right,
+                    source="geotiff",
+                )
+        elif npy_path.exists():
+            logger.info(f"Loading raster array: {npy_path}")
+            data = np.load(npy_path).astype(np.float32)
             layers[factor] = RasterLayer(
                 name=factor,
                 data=data,
-                nodata_value=nodata,
-                lat_min=bounds.bottom,
-                lat_max=bounds.top,
-                lon_min=bounds.left,
-                lon_max=bounds.right,
-                source="geotiff",
+                lat_min=-90.0,
+                lat_max=-80.0,
+                lon_min=-180.0,
+                lon_max=180.0,
+                source="npy_raster",
             )
-            logger.info(
-                f"  Loaded {factor}: shape={data.shape}, "
-                f"bounds=({bounds.left:.1f},{bounds.bottom:.1f}) → "
-                f"({bounds.right:.1f},{bounds.top:.1f})"
+        else:
+            raise FileNotFoundError(
+                f"Raster layer not found: {path} or {npy_path}\n"
+                f"Run 'python backend/scripts/generate_sample_geotiffs.py' "
+                f"or set USE_MOCK_DATA=true in .env."
             )
 
     return layers

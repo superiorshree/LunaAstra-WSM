@@ -13,18 +13,20 @@
     "electron:build": "vite build && electron-builder"
   },
   "dependencies": {
+    "cesium": "^1.144.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7",
-    "zustand": "^4.5.5"
+    "recharts": "^2.15.4",
+    "vite-plugin-cesium": "^1.2.23",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
-    "concurrently": "^9.0.1",
+    "concurrently": "^9.2.4",
     "electron": "^32.0.1",
     "electron-builder": "^25.0.5",
     "vite": "^5.4.1",
-    "wait-on": "^8.0.1"
+    "wait-on": "^8.0.5"
   },
   "build": {
     "appId": "com.lunastra.wsm",
@@ -36,5 +38,9 @@
       "dist/**/*",
       "electron/**/*"
     ]
+  },
+  "allowScripts": {
+    "electron@32.3.3": true,
+    "esbuild@0.21.5": true
   }
 }
